@@ -1,5 +1,5 @@
 """
-FAQ CHATBOT BACKEND - NLTK 
+FAQ CHATBOT BACKEND - NLTK (FIXED VERSION)
 ================================
 Clean backend implementation using only NLTK library
 No spaCy dependency required
@@ -32,8 +32,60 @@ except LookupError:
     nltk.download('wordnet')
     nltk.download('omw-1.4')
 
-# ==================== FAQ DATABASE ====================
-FAQ_DATABASE = pd.read_csv('data.csv')
+
+def load_faq_database():
+    """Load FAQ database from CSV and convert keywords to list"""
+    # Read CSV with explicit handling
+    df = pd.read_csv('data.csv', encoding='utf-8')
+    
+    # Debug: Print what we loaded
+    print("\n" + "="*60)
+    print("LOADING FAQ DATABASE")
+    print("="*60)
+    print(f"CSV Columns: {df.columns.tolist()}")
+    print(f"Total rows: {len(df)}")
+    print("\nFirst row raw data:")
+    for col in df.columns:
+        print(f"  {col}: '{df.iloc[0][col]}'")
+    
+    # Rename faq_id to id
+    if 'faq_id' in df.columns:
+        df = df.rename(columns={'faq_id': 'id'})
+    elif 'id' not in df.columns:
+        df['id'] = range(1, len(df) + 1)
+    
+    # Convert keywords column (comma-separated string) to list
+    if 'keywords' in df.columns:
+        df['keywords'] = df['keywords'].apply(
+            lambda x: [kw.strip().lower() for kw in str(x).split(',') if kw.strip()]
+        )
+    else:
+        print("WARNING: No 'keywords' column found!")
+        df['keywords'] = [[] for _ in range(len(df))]
+    
+    # Ensure all required columns exist
+    required_cols = ['id', 'question', 'answer', 'keywords', 'category']
+    for col in required_cols:
+        if col not in df.columns:
+            print(f"ERROR: Missing required column: {col}")
+            print(f"Available columns: {df.columns.tolist()}")
+            raise ValueError(f"CSV missing required column: {col}")
+    
+    # Select only required columns in correct order
+    df = df[required_cols].copy()
+    
+    # Debug: Print processed first record
+    print("\nProcessed first FAQ record:")
+    first_record = df.iloc[0].to_dict()
+    for key, value in first_record.items():
+        print(f"  {key}: {value}")
+    print("="*60 + "\n")
+    
+    return df.to_dict('records')
+
+
+FAQ_DATABASE = load_faq_database()
+
 
 # ==================== TEXT PREPROCESSOR ====================
 class TextPreprocessor:
@@ -152,6 +204,10 @@ class FAQMatcher:
         self.faq_df = pd.DataFrame(faq_data)
         self.preprocessor = TextPreprocessor()
         
+        # Ensure 'id' column exists
+        if 'id' not in self.faq_df.columns:
+            self.faq_df.insert(0, 'id', range(1, len(self.faq_df) + 1))
+        
         # Preprocess all FAQ questions
         self.faq_df['processed_question'] = self.faq_df['question'].apply(
             self.preprocessor.preprocess
@@ -202,8 +258,8 @@ class FAQMatcher:
         # Get query tokens
         query_tokens = set(self.preprocessor.preprocess(user_query).split())
         
-        # Get FAQ keywords
-        faq_keywords = set(self.faq_df.iloc[faq_idx]['keywords'])
+        # Get FAQ keywords (convert to lowercase)
+        faq_keywords = set([str(kw).lower() for kw in self.faq_df.iloc[faq_idx]['keywords']])
         
         # Calculate Jaccard similarity
         if len(query_tokens) == 0:
@@ -254,12 +310,30 @@ class FAQMatcher:
         # Get keyword score for best match
         keyword_score = self.keyword_match_score(user_query, best_idx)
         
-        # Prepare result
+        # Prepare result - safely convert types
+        faq_row = self.faq_df.iloc[best_idx]
+        
+        # Debug print
+        print(f"Best match index: {best_idx}")
+        print(f"FAQ row data: {faq_row.to_dict()}")
+        
+        # Safely get ID - try multiple ways
+        try:
+            if 'id' in faq_row and pd.notna(faq_row['id']):
+                faq_id = int(faq_row['id'])
+            elif 'faq_id' in faq_row and pd.notna(faq_row['faq_id']):
+                faq_id = int(faq_row['faq_id'])
+            else:
+                faq_id = best_idx + 1
+        except (ValueError, TypeError):
+            faq_id = best_idx + 1
+            print(f"Warning: Could not convert ID to int, using index: {faq_id}")
+        
         result = {
-            'faq_id': int(self.faq_df.iloc[best_idx]['id']),
-            'question': self.faq_df.iloc[best_idx]['question'],
-            'answer': self.faq_df.iloc[best_idx]['answer'],
-            'category': self.faq_df.iloc[best_idx]['category'],
+            'faq_id': faq_id,
+            'question': str(faq_row['question']),
+            'answer': str(faq_row['answer']),
+            'category': str(faq_row['category']),
             'confidence': float(best_score),
             'cosine_score': float(cosine_similarity(
                 self.vectorizer.transform([self.preprocessor.preprocess(user_query)]),
@@ -314,6 +388,13 @@ class FAQChatbot:
         # Find best match
         match = self.matcher.hybrid_match(user_query)
         
+        # Debug: Print match result
+        print(f"\n--- Query: '{user_query}' ---")
+        print(f"Matched FAQ ID: {match.get('faq_id')}")
+        print(f"Matched Question: {match.get('question')}")
+        print(f"Answer (first 100 chars): {match.get('answer')[:100]}...")
+        print(f"Confidence: {match.get('confidence'):.2%}")
+        
         # Store in conversation history
         self.conversation_history.append({
             'query': user_query,
@@ -348,7 +429,8 @@ class FAQChatbot:
     
     def get_categories(self) -> List[str]:
         """Get unique categories"""
-        return list(set(faq['category'] for faq in self.faq_data))
+        categories = list(set(faq['category'] for faq in self.faq_data))
+        return sorted(categories)
     
     def get_conversation_history(self) -> List[Dict]:
         """Get conversation history"""
@@ -398,11 +480,11 @@ if __name__ == "__main__":
     print("=" * 60)
     
     test_queries = [
-        "What time do you open?",
-        "I forgot my password",
-        "How can I pay?",
-        "Track my package",
-        "Return policy?"
+        "What programs are offered by the university?",
+        "How can I apply for admission?",
+        "What is the minimum eligibility for BS programs?",
+        "Is entry test compulsory?",
+        "What is the admission schedule?"
     ]
     
     for query in test_queries:

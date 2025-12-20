@@ -1,5 +1,5 @@
 """
-STREAMLIT FRONTEND FOR FAQ CHATBOT
+STREAMLIT FRONTEND FOR FAQ CHATBOT (FIXED)
 ===================================
 Beautiful interactive UI that connects to FastAPI backend
 
@@ -206,11 +206,19 @@ def send_query(query):
             json={"query": query},
             timeout=10
         )
+        response.raise_for_status()
         return response.json()
+    except requests.exceptions.HTTPError as e:
+        return {
+            "success": False,
+            "message": f"API Error: {e.response.text if hasattr(e, 'response') else str(e)}",
+            "confidence": 0.0
+        }
     except Exception as e:
         return {
             "success": False,
-            "message": f"Error connecting to API: {str(e)}"
+            "message": f"Error connecting to API: {str(e)}",
+            "confidence": 0.0
         }
 
 
@@ -218,8 +226,10 @@ def get_all_faqs():
     """Get all FAQs from API"""
     try:
         response = requests.get(f"{API_BASE_URL}/api/faqs", timeout=5)
+        response.raise_for_status()
         return response.json()
-    except:
+    except Exception as e:
+        st.error(f"Error loading FAQs: {str(e)}")
         return []
 
 
@@ -227,8 +237,10 @@ def get_statistics():
     """Get chatbot statistics from API"""
     try:
         response = requests.get(f"{API_BASE_URL}/api/statistics", timeout=5)
+        response.raise_for_status()
         return response.json()
-    except:
+    except Exception as e:
+        st.error(f"Error loading statistics: {str(e)}")
         return None
 
 
@@ -236,8 +248,16 @@ def get_categories():
     """Get all categories from API"""
     try:
         response = requests.get(f"{API_BASE_URL}/api/categories", timeout=5)
-        return response.json()
-    except:
+        response.raise_for_status()
+        data = response.json()
+        # Ensure it's a list
+        if isinstance(data, list):
+            return data
+        else:
+            st.error(f"Unexpected categories format: {type(data)}")
+            return []
+    except Exception as e:
+        st.error(f"Error loading categories: {str(e)}")
         return []
 
 
@@ -326,15 +346,15 @@ with st.sidebar:
     # Sample Questions
     st.markdown("### 💡 Try asking:")
     sample_questions = [
-        "What are your hours?",
-        "How do I reset password?",
-        "Payment methods?",
-        "Shipping time?",
-        "Return policy?"
+        "What programs are offered?",
+        "What is the admission schedule?",
+        "Is entry test compulsory?",
+        "How can I apply for admission?",
+        "What is the minimum eligibility?"
     ]
     
-    for question in sample_questions:
-        if st.button(question, key=f"sample_{question}"):
+    for idx, question in enumerate(sample_questions):
+        if st.button(question, key=f"sample_{idx}"):
             st.session_state.sample_query = question
 
 # ==================== MAIN CONTENT ====================
@@ -390,7 +410,7 @@ if page == "💬 Chat":
         
         # Show typing indicator
         with st.spinner('🤔 Thinking...'):
-            time.sleep(0.5)  # Small delay for better UX
+            time.sleep(0.5)
             
             # Get response from API
             response = send_query(query)
@@ -404,7 +424,7 @@ if page == "💬 Chat":
                     'content': response['answer'],
                     'timestamp': timestamp,
                     'metadata': {
-                        'confidence': response['confidence'],
+                        'confidence': response.get('confidence', 0),
                         'category': response.get('category'),
                         'matched_question': response.get('matched_question')
                     }
@@ -439,7 +459,7 @@ elif page == "📊 Statistics":
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-label">Total Queries</div>
-                    <div class="metric-value">{stats['total_queries']}</div>
+                    <div class="metric-value">{stats.get('total_queries', 0)}</div>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -447,12 +467,14 @@ elif page == "📊 Statistics":
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-label">Successful Matches</div>
-                    <div class="metric-value">{stats['successful_matches']}</div>
+                    <div class="metric-value">{stats.get('successful_matches', 0)}</div>
                 </div>
                 """, unsafe_allow_html=True)
             
             with col3:
-                success_rate = (stats['successful_matches'] / stats['total_queries'] * 100) if stats['total_queries'] > 0 else 0
+                total = stats.get('total_queries', 0)
+                success = stats.get('successful_matches', 0)
+                success_rate = (success / total * 100) if total > 0 else 0
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-label">Success Rate</div>
@@ -464,14 +486,14 @@ elif page == "📊 Statistics":
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-label">Avg Confidence</div>
-                    <div class="metric-value">{stats['average_confidence']:.0%}</div>
+                    <div class="metric-value">{stats.get('average_confidence', 0):.0%}</div>
                 </div>
                 """, unsafe_allow_html=True)
             
             st.markdown("---")
             
             # Charts
-            if stats['categories_used']:
+            if stats.get('categories_used'):
                 st.markdown("### 📈 Categories Usage")
                 
                 # Category distribution
@@ -496,26 +518,33 @@ elif page == "📚 FAQ Database":
         faqs = get_all_faqs()
         categories = get_categories()
         
-        # Filter by category
-        st.markdown("### 🔍 Filter by Category")
-        selected_category = st.selectbox(
-            "Select Category",
-            ["All"] + categories,
-            label_visibility="collapsed"
-        )
-        
-        # Display FAQs
-        if selected_category != "All":
-            faqs = [faq for faq in faqs if faq['category'] == selected_category]
-        
-        st.markdown(f"### Showing {len(faqs)} FAQs")
-        
-        for faq in faqs:
-            with st.expander(f"❓ {faq['question']}", expanded=False):
-                st.markdown(f"**Category:** `{faq['category']}`")
-                st.markdown(f"**Answer:** {faq['answer']}")
-                st.markdown(f"**Keywords:** {', '.join(faq['keywords'])}")
-                st.markdown(f"**ID:** {faq['id']}")
+        if faqs and categories:
+            # Filter by category
+            st.markdown("### 🔍 Filter by Category")
+            selected_category = st.selectbox(
+                "Select Category",
+                ["All"] + list(categories),  # Ensure categories is a list
+                label_visibility="collapsed"
+            )
+            
+            # Display FAQs
+            if selected_category != "All":
+                faqs = [faq for faq in faqs if faq.get('category') == selected_category]
+            
+            st.markdown(f"### Showing {len(faqs)} FAQs")
+            
+            for faq in faqs:
+                with st.expander(f"❓ {faq.get('question', 'N/A')}", expanded=False):
+                    st.markdown(f"**Category:** `{faq.get('category', 'N/A')}`")
+                    st.markdown(f"**Answer:** {faq.get('answer', 'N/A')}")
+                    keywords = faq.get('keywords', [])
+                    if isinstance(keywords, list):
+                        st.markdown(f"**Keywords:** {', '.join(keywords)}")
+                    else:
+                        st.markdown(f"**Keywords:** {keywords}")
+                    st.markdown(f"**ID:** {faq.get('id', 'N/A')}")
+        else:
+            st.warning("No FAQs available or unable to load categories.")
     else:
         st.error("Cannot load FAQs. API is not connected.")
 
@@ -596,7 +625,7 @@ elif page == "ℹ️ About":
     ---
     
     **Version:** 1.0.0  
-    **Last Updated:** December 2026
+    **Last Updated:** December 2025
                 
     """)
 
@@ -605,6 +634,6 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: white; opacity: 0.8;'>
     <p>🤖 AI FAQ Chatbot | Built with Python, NLTK, FastAPI & Streamlit</p>
-    <p>💡 AI Engineering Internship Project 2024</p>
+    <p>💡 AI Engineering Internship Project 2025</p>
 </div>
 """, unsafe_allow_html=True)
