@@ -1,0 +1,31 @@
+faq_id,question,answer,keywords,category
+1,What programs are offered by the university?,The university offers undergraduate and postgraduate programs in science engineering business arts and social sciences.,programs,courses,departments,Admissions
+2,How can I apply for admission?,Admissions can be applied online through the official admission portal.,apply,admission,online,Admissions
+3,What is the minimum eligibility for BS programs?,Applicants must have completed intermediate or equivalent education.,eligibility,bs,requirements,Admissions
+4,Is entry test compulsory?,Yes entry test is mandatory for most undergraduate programs.,entry test,exam,admission,Admissions
+5,What is the admission schedule?,Admission schedule is announced on the university website.,schedule,admission,dates,Admissions
+6,Can I apply for multiple programs?,Yes students can apply for multiple programs by submitting separate preferences.,multiple programs,apply,Admissions
+7,Are transfer admissions allowed?,Yes transfer admissions are allowed subject to seat availability.,transfer,admission,Admissions
+8,Is evening program available?,Yes selected programs are offered in evening sessions.,evening,program,timing,Admissions
+9,What documents are required for admission?,Required documents include transcripts CNIC and photographs.,documents,admission,requirements,Admissions
+10,How can international students apply?,International students can apply through the international office.,international,students,apply,Admissions
+11,What is the fee structure?,Fee structure varies by program and is available online.,fee,structure,charges,Finance
+12,Is fee refundable?,Fee refund follows HEC refund policy.,refund,fee,policy,Finance
+13,Can fee be paid in installments?,Yes installment facility is available upon request.,installment,fee,Finance
+14,Are scholarships available?,Yes merit and need based scholarships are offered.,scholarship,financial aid,Finance
+15,How do I apply for scholarship?,Scholarship forms are available on the student portal.,scholarship,apply,Finance
+16,What is semester duration?,Each semester lasts approximately 16 weeks.,semester,duration,Academics
+17,What is credit hour system?,Courses are assigned credit hours based on workload.,credit hours,academics,Academics
+18,What is minimum attendance requirement?,Minimum 75 percent attendance is required.,attendance,policy,Academics
+19,Can I repeat a course?,Yes students can repeat courses to improve grades.,repeat,course,Academics
+20,What grading system is followed?,University follows GPA based grading system.,grading,gpa,Academics
+21,How are exams conducted?,Exams include midterm and final examinations.,exam,system,Academics
+22,How can I check exam results?,Results are published on student portal.,results,exam,Academics
+23,Can I apply for rechecking?,Yes rechecking applications are accepted.,rechecking,exam,Academics
+24,What is LMS?,LMS is an online learning management system.,lms,online,learning,IT
+25,How do I login to LMS?,Login credentials are provided after enrollment.,login,lms,IT
+26,What if I forget LMS password?,Password can be reset using forgot password option.,reset,password,lms,IT
+27,Is hostel facility available?,Yes hostels are available for students.,hostel,accommodation,Facilities
+28,How can I apply for hostel?,Hostel applications are submitted online.,hostel,apply,Facilities
+29,Is transport facility available?,University provides transport on selected routes.,transport,bus,Facilities
+30,Is library available?,Central library is available for all students.,library,books,Facilities
