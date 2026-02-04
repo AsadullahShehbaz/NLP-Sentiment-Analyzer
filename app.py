@@ -11,7 +11,7 @@ from main import load_model, predict_sentiment
 # PAGE CONFIG
 # -------------------------------------------------
 st.set_page_config(
-    page_title="IMDB Sentiment Analyzer",
+    page_title="Production-Ready NLP Sentiment Analysis System",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -28,7 +28,7 @@ def get_model():
     return tokenizer, model
 
 def main():
-    st.title("🎬 IMDB Sentiment Analyzer")
+    st.title("🎬 Production-Ready NLP Sentiment Analyzer")
     st.caption("Fine‑tuned DistilBERT for movie review sentiment analysis")
 
     # ---------- Sidebar ----------
