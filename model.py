@@ -1,54 +1,52 @@
 """
-🧠 Core Logic for IMDB Sentiment Classifier
-Handles model loading and inference only
+NLP Model Logic - Handles model loading and inference
 """
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-from logg import logger
-
-# -------------------------------------------------
-# Model constants
-# -------------------------------------------------
 MODEL_NAME = "asadullahshehbaz/my_text_classifier_model"
 
 
 def load_model():
     """
-    Load fine‑tuned DistilBERT model and tokenizer.
+    Load fine-tuned DistilBERT model and tokenizer.
+    
     Returns:
-        tokenizer, model
+        tuple: (tokenizer, model)
     """
     try:
-        logger.info("Loading tokenizer from %s", MODEL_NAME)
+        print(f"Loading tokenizer from {MODEL_NAME}")
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-
-        logger.info("Loading model from %s", MODEL_NAME)
+        
+        print(f"Loading model from {MODEL_NAME}")
         model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
         model.eval()
-
-        logger.info("Model and tokenizer loaded successfully.")
+        
+        print("Model and tokenizer loaded successfully")
         return tokenizer, model
     except Exception as e:
-        logger.exception("Failed to load model or tokenizer: %s", e)
+        print(f"Failed to load model: {e}")
         raise
 
 
 def predict_sentiment(text: str, tokenizer, model):
     """
     Predict sentiment for a given text.
-
+    
     Args:
-        text (str): Input sentence / review.
-        tokenizer: Tokenizer instance.
-        model: Model instance.
-
+        text (str): Input review text
+        tokenizer: Tokenizer instance
+        model: Model instance
+    
     Returns:
-        dict with sentiment, confidence, positive_prob, negative_prob
+        dict: {
+            'sentiment': str,
+            'confidence': float,
+            'positive_prob': float,
+            'negative_prob': float
+        }
     """
-    logger.debug("Received text for prediction: %s", text)
-
-    # Tokenize
+    # Tokenize input
     inputs = tokenizer(
         text,
         return_tensors="pt",
@@ -56,27 +54,18 @@ def predict_sentiment(text: str, tokenizer, model):
         max_length=512,
         padding=True
     )
-    logger.debug("Tokenized inputs: %s", inputs)
-
+    
     # Inference
     with torch.no_grad():
         outputs = model(**inputs)
         probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
-
+    
     negative_prob = probs[0][0].item()
     positive_prob = probs[0][1].item()
-
+    
     sentiment = "Positive 😊" if positive_prob > negative_prob else "Negative 😞"
     confidence = max(positive_prob, negative_prob)
-
-    logger.info(
-        "Predicted Sentiment: %s | Confidence: %.4f | Pos: %.4f | Neg: %.4f",
-        sentiment,
-        confidence,
-        positive_prob,
-        negative_prob,
-    )
-
+    
     return {
         "sentiment": sentiment,
         "confidence": confidence,

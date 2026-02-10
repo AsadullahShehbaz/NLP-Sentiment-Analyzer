@@ -1,48 +1,67 @@
-import time
+"""
+Streamlit Frontend - Web UI for Sentiment Analysis
+Connects to FastAPI backend via HTTP requests
+"""
 import streamlit as st
 import plotly.graph_objects as go
-import sys
-from logg import logger 
-
-from main import load_model, predict_sentiment
+import requests
 
 
-# -------------------------------------------------
-# PAGE CONFIG
-# -------------------------------------------------
+# Page config
 st.set_page_config(
-    page_title="Production-Ready NLP Sentiment Analysis System",
+    page_title="Sentiment Analysis System",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# -------------------------------------------------
-# CACHE MODEL
-# -------------------------------------------------
-@st.cache_resource
-def get_model():
-    logger.info("Loading model & tokenizer …")
-    tokenizer, model = load_model()
-    logger.info("Model loaded successfully")
-    return tokenizer, model
+
+# API Configuration
+API_URL = "http://localhost:8000"
+
+
+def check_api_health():
+    """Check if API is available"""
+    try:
+        response = requests.get(f"{API_URL}/health", timeout=5)
+        return response.status_code == 200
+    except:
+        return False
+
+
+def predict_sentiment(text: str):
+    """Call FastAPI backend to predict sentiment"""
+    try:
+        response = requests.post(
+            f"{API_URL}/predict",
+            json={"text": text},
+            timeout=10
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.ConnectionError:
+        raise Exception("❌ Cannot connect to API. Make sure backend is running at " + API_URL)
+    except Exception as e:
+        raise Exception(f"❌ Error: {str(e)}")
+
 
 def main():
-    st.title("🎬 Production-Ready NLP Sentiment Analyzer")
-    st.caption("Fine‑tuned DistilBERT for movie review sentiment analysis")
+    st.title("🎬 NLP Sentiment Analyzer")
+    st.caption("Fine-tuned DistilBERT for movie review sentiment analysis")
 
-    # ---------- Sidebar ----------
+    # Sidebar
     with st.sidebar:
         st.header("📊 Model Info")
         st.info(
             """
-            **Model:** DistilBERT (fine‑tuned)  
+            **Model:** DistilBERT (fine-tuned)  
             **Dataset:** IMDB Reviews  
             **Accuracy:** 86.25%  
             **Framework:** PyTorch + HuggingFace
             """
         )
         st.divider()
+        
         st.header("🎯 How to Use")
         st.markdown(
             """
@@ -51,25 +70,26 @@ def main():
             3. View prediction & confidence
             """
         )
-        logger.debug("Sidebar rendered")
-
-    # ---------- Load model ----------
-    with st.spinner("🔄 Loading model…"):
-        tokenizer, model = get_model()
-    st.success("✅ Model loaded successfully")
+        
+        st.divider()
+        # API health check
+        if check_api_health():
+            st.success("✅ API Connected")
+        else:
+            st.error("❌ API Disconnected")
 
     st.divider()
 
-    # ---------- Input ----------
+    # Input section
     st.subheader("📝 Enter Movie Review")
+    
     samples = {
-        "Positive Example": "This movie was absolutely amazing! The acting was impressive .",
-        "Negative Example": "Terrible movie. Predictable story and bad acting.",
+        "Positive Example": "This movie was absolutely amazing! The acting was impressive and the story kept me engaged.",
+        "Negative Example": "Terrible movie. Predictable story and bad acting. Complete waste of time.",
         "Custom Review": ""
     }
-    choice = st.selectbox("Choose sample:", samples.keys())
-    logger.debug(f"Sample choice: {choice}")
-
+    
+    choice = st.selectbox("Choose sample or write your own:", samples.keys())
     user_input = st.text_area(
         "Review Text",
         value=samples[choice],
@@ -77,42 +97,35 @@ def main():
         placeholder="Write your review here..."
     )
 
-    # ---------- Analyze ----------
-    _, col, _ = st.columns([1, 2, 1])
-    with col:
-        analyze = st.button("🚀 Analyze Sentiment", use_container_width=True)
+    # Analyze button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        analyze_btn = st.button("🚀 Analyze Sentiment", use_container_width=True)
 
-    if analyze:
+    # Prediction
+    if analyze_btn:
         if not user_input.strip():
             st.warning("⚠️ Please enter a review")
-            logger.warning("Analyze clicked with empty review")
             return
 
-        logger.info(f"User review (truncated): {user_input[:75]!r}…")
         try:
-            with st.spinner("🤖 Analyzing…"):
-                time.sleep(0.4)
-                result = predict_sentiment(user_input, tokenizer, model)
-        except Exception as exc:
-            logger.exception("Prediction failed")
-            st.error("❌ An error occurred while analyzing the review.")
+            with st.spinner("🤖 Analyzing..."):
+                result = predict_sentiment(user_input)
+        except Exception as e:
+            st.error(str(e))
             return
 
-        logger.info(
-            f"Result – Sentiment: {result['sentiment']}, "
-            f"Confidence: {result['confidence']:.2%}"
-        )
-        logger.debug(
-            f"Probabilities – Neg: {result['negative_prob']:.4f}, "
-            f"Pos: {result['positive_prob']:.4f}"
-        )
-
-        # ---------- Display results ----------
+        # Display results
         st.divider()
         st.subheader("📊 Results")
-        st.metric("Sentiment", result["sentiment"])
-        st.metric("Confidence", f"{result['confidence']*100:.2f}%")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Sentiment", result["sentiment"])
+        with col2:
+            st.metric("Confidence", f"{result['confidence']*100:.2f}%")
 
+        # Probability chart
         fig = go.Figure([
             go.Bar(
                 x=["Negative", "Positive"],
@@ -121,18 +134,22 @@ def main():
                     f"{result['negative_prob']*100:.2f}%",
                     f"{result['positive_prob']*100:.2f}%"
                 ],
-                textposition="auto"
+                textposition="auto",
+                marker_color=["#ff6b6b", "#51cf66"]
             )
         ])
         fig.update_layout(
             title="Sentiment Probability Distribution",
+            yaxis_title="Probability (%)",
             yaxis_range=[0, 100],
-            template="plotly_white"
+            template="plotly_white",
+            height=400
         )
         st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
     st.caption("Built with ❤️ using Streamlit & HuggingFace")
+
 
 if __name__ == "__main__":
     main()
